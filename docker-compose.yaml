@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # 1. Database Service
+  library-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    user: root
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=MyComplexPass123
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P MyComplexPass123 -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      retries: 20
+      start_period: 30s
+      timeout: 3s
+
+  # 2. Schema Initializer (Runs once then exits)
+  db-init:
+    image: mcr.microsoft.com/mssql-tools
+    depends_on:
+      library-db:
+        condition: service_healthy
+    volumes:
+      - ./db/schema.sql:/tmp/schema.sql
+    command: >
+      /bin/bash -c "
+      /opt/mssql-tools/bin/sqlcmd -S library-db -U sa -P MyComplexPass123 -i /tmp/schema.sql
+      "
+
+  # 3. The Java Web Application
+  library-web:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      library-db:
+        condition: service_healthy
+    environment:
+      # Override Spring Boot properties for the container environment
+      SPRING_DATASOURCE_URL: jdbc:sqlserver://library-db:1433;databaseName=LibraryDB;encrypt=false
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: MyComplexPass123
