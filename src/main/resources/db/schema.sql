@@ -1,7 +1,9 @@
 USE master;
 GO
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'LibraryDB')
+BEGIN
     CREATE DATABASE LibraryDB;
+END
 GO
 USE LibraryDB;
 GO
